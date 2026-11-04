@@ -1,0 +1,20 @@
+# Dependencies (each developer runs npm install to recreate these)
+node_modules/
+
+# Secrets: real environment files must never be pushed to GitHub.
+# .env.example is allowed because it contains no real secrets.
+.env
+.env.*
+!.env.example
+
+# Build output and test coverage
+client/dist/
+coverage/
+
+# Logs and editor/OS files
+*.log
+npm-debug.log*
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
