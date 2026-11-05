@@ -1,54 +1,38 @@
+
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Atom, Cpu, Dna, FlaskConical, Leaf, Lock, Star, Trophy, Flame } from "lucide-react";
+import {
+  Star,
+  Trophy,
+  BookOpen,
+  Users,
+  Leaf,
+  Target,
+  Award,
+  BarChart3,
+} from "lucide-react";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
-import AnimatedNumber from "../components/AnimatedNumber.jsx";
-
-const SUBJECT_ICONS = {
-  physics: Atom,
-  chemistry: FlaskConical,
-  biology: Dna,
-  "computer-science": Cpu,
-  "eco-action": Leaf,
-};
-
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
-const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } };
-
-function Stat({ icon: Icon, label, value }) {
-  return (
-    <motion.div className="stat" variants={item} whileHover={{ y: -3 }}>
-      <Icon size={20} />
-      <span className="big">
-        <AnimatedNumber value={value} />
-      </span>
-      <span className="hint">{label}</span>
-    </motion.div>
-  );
-}
+import TeacherDashboard from "./TeacherDashboard.jsx";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const isStudent = user.role === "student";
+  const isStudent = user?.role === "student";
+
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [notice, setNotice] = useState(null);
 
   const load = useCallback(async () => {
-    const [progress, classes, subjects, badges] = await Promise.all([
-      api("/progress/me"),
+    const [stats, classes] = await Promise.all([
+      api("/stats/me"),
       api("/classes"),
-      api("/subjects"),
-      api("/badges/me"),
     ]);
+
     setData({
-      progress: progress.data,
-      classes: classes.data.classes,
-      subjects: subjects.data.subjects,
-      badges: badges.data.badges,
+      stats: stats.data,
+      classes: classes.data.classes || [],
     });
   }, []);
 
@@ -61,35 +45,48 @@ export default function DashboardPage() {
   async function joinClass(event) {
     event.preventDefault();
     setNotice(null);
+
     try {
-      const response = await api("/classes/join", { method: "POST", body: { joinCode } });
-      setNotice({ ok: true, text: response.message });
+      const response = await api("/classes/join", {
+        method: "POST",
+        body: { joinCode: joinCode.trim() },
+      });
+
+      setNotice({
+        ok: true,
+        text: response.message,
+      });
+
       setJoinCode("");
       await load();
     } catch (err) {
-      setNotice({ ok: false, text: err.message });
+      setNotice({
+        ok: false,
+        text: err.message,
+      });
     }
   }
 
   if (!isStudent) {
-    return (
-      <section className="card">
-        <h1>Teacher dashboard</h1>
-        <p className="hint">
-          The teacher dashboard with class analytics is part of a later stage. For now, manage classes on the
-          classic page at http://localhost:5000.
-        </p>
-      </section>
-    );
+    return <TeacherDashboard />;
   }
 
-  if (error) return <p className="notice error">{error}</p>;
-  if (!data) return <div className="loading">Loading your dashboard...</div>;
+  if (error) {
+    return <p className="notice error">{error}</p>;
+  }
 
-  const { summary, subjects: subjectProgress } = data.progress;
-  const levelPercent = Math.min(100, Math.round((summary.xpIntoLevel / summary.xpPerLevel) * 100));
-  const completionFor = (slug) =>
-    subjectProgress.find((p) => p.subject.slug === slug)?.completionPercent ?? 0;
+  if (!data) {
+    return <div className="loading">Loading your dashboard...</div>;
+  }
+
+  const { stats, classes } = data;
+
+  const levelPercent = Math.min(
+    100,
+    Math.round(
+      (stats.xpIntoLevel / stats.xpForNextLevel) * 100
+    )
+  );
 
   return (
     <>
@@ -102,97 +99,163 @@ export default function DashboardPage() {
           <p className="hint">Welcome back</p>
           <h1>{user.name}</h1>
           <p>
-            Level <strong>{summary.level}</strong> · {summary.xpIntoLevel} of {summary.xpPerLevel} XP to the next level
+            Level <strong>{stats.level}</strong> ·{" "}
+            {stats.xpIntoLevel} of {stats.xpForNextLevel} XP
+            toward the next level
           </p>
         </div>
+
         <div className="bar level-bar">
           <motion.div
             className="bar-fill"
             initial={{ width: 0 }}
             animate={{ width: `${levelPercent}%` }}
-            transition={{ duration: 1, ease: "easeOut" }}
+            transition={{ duration: 1 }}
           />
         </div>
       </motion.section>
 
-      <motion.section className="stats" variants={container} initial="hidden" animate="show">
-        <Stat icon={Star} label="Level" value={summary.level} />
-        <Stat icon={Trophy} label="XP" value={summary.totalXp} />
-        <Stat icon={Star} label="Points" value={summary.totalPoints} />
-        <Stat icon={Flame} label="Day streak" value={summary.currentStreak} />
-      </motion.section>
+      <section className="stats">
+        <div className="stat">
+          <Star size={22} />
+          <span className="big">{stats.level}</span>
+          <span className="hint">Level</span>
+        </div>
+
+        <div className="stat">
+          <Trophy size={22} />
+          <span className="big">{stats.xp}</span>
+          <span className="hint">Total XP</span>
+        </div>
+
+        <div className="stat">
+          <Target size={22} />
+          <span className="big">{stats.attempts}</span>
+          <span className="hint">Quiz Attempts</span>
+        </div>
+
+        <div className="stat">
+          <BarChart3 size={22} />
+          <span className="big">{stats.avgPercent}%</span>
+          <span className="hint">Average Score</span>
+        </div>
+      </section>
 
       <section className="card">
-        <h2>Subjects</h2>
-        <motion.div className="subject-grid" variants={container} initial="hidden" animate="show">
-          {data.subjects.map((subject) => {
-            const Icon = SUBJECT_ICONS[subject.slug] || Star;
-            const percent = completionFor(subject.slug);
-            return (
-              <motion.div key={subject.id} variants={item}>
-                <Link to={`/subjects/${subject.slug}`} className={`subject-card subject-${subject.slug}`}>
-                  <Icon size={28} />
-                  <strong>{subject.name}</strong>
-                  <span className="hint">{subject.description}</span>
-                  <div className="bar small">
-                    <motion.div
-                      className="bar-fill"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percent}%` }}
-                      transition={{ duration: 0.9 }}
-                    />
-                  </div>
-                  <span className="hint">{percent}% complete</span>
-                </Link>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-        {data.subjects.length === 0 && (
-          <p className="hint">No subjects yet. Run the seed script on the server to load the course content.</p>
-        )}
+        <h2>Learning Progress</h2>
+
+        <div className="stats">
+          <div className="stat">
+            <BookOpen size={22} />
+            <span className="big">
+              {stats.lessonsCompleted}
+            </span>
+            <span className="hint">Lessons Completed</span>
+          </div>
+
+          <div className="stat">
+            <Leaf size={22} />
+            <span className="big">{stats.ecoActions}</span>
+            <span className="hint">Eco Actions</span>
+          </div>
+
+          <div className="stat">
+            <Award size={22} />
+            <span className="big">
+              {stats.approvedMissions}
+            </span>
+            <span className="hint">Approved Missions</span>
+          </div>
+        </div>
       </section>
 
       <section className="card">
         <h2>Achievements</h2>
-        <motion.div className="badge-grid" variants={container} initial="hidden" animate="show">
-          {data.badges.map((badge) => (
-            <motion.div
-              key={badge.id}
-              variants={item}
-              className={badge.earned ? "badge earned" : "badge"}
-              title={badge.description}
-            >
-              {badge.earned ? <Trophy size={22} /> : <Lock size={22} />}
-              <strong>{badge.name}</strong>
-              <span className="hint">{badge.description}</span>
-            </motion.div>
-          ))}
-        </motion.div>
+
+        {stats.badges.length === 0 ? (
+          <p className="hint">
+            No badges earned yet. Complete learning activities
+            to unlock achievements.
+          </p>
+        ) : (
+          <div className="badge-grid">
+            {stats.badges.map((badge) => (
+              <div
+                key={badge.code}
+                className="badge earned"
+              >
+                <Trophy size={22} />
+                <strong>{badge.name}</strong>
+                <span className="hint">
+                  {badge.description}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="card">
-        <h2>Classes</h2>
-        <form onSubmit={joinClass} className="inline">
-          <input
-            placeholder="Join code"
-            required
-            maxLength={12}
-            aria-label="Join code"
-            value={joinCode}
-            onChange={(event) => setJoinCode(event.target.value)}
-          />
-          <button className="primary" type="submit">Join class</button>
-        </form>
-        {notice && <p className={`notice ${notice.ok ? "ok" : "error"}`}>{notice.text}</p>}
-        {data.classes.length === 0 ? (
-          <p className="hint">You have not joined a class yet.</p>
+        <h2>Recent Quiz Performance</h2>
+
+        {stats.recent.length === 0 ? (
+          <p className="hint">
+            No quiz attempts yet.
+          </p>
         ) : (
           <ul className="list">
-            {data.classes.map((c) => (
+            {stats.recent.map((attempt, index) => (
+              <li key={index}>
+                <strong>{attempt.title}</strong>
+                <span>{attempt.percent}%</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2><Users size={22} /> My Classes</h2>
+
+        <form
+          onSubmit={joinClass}
+          className="inline"
+        >
+          <input
+            type="text"
+            placeholder="Enter class join code"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            maxLength={12}
+            required
+          />
+
+          <button
+            type="submit"
+            className="primary"
+          >
+            Join Class
+          </button>
+        </form>
+
+        {notice && (
+          <p className={`notice ${notice.ok ? "ok" : "error"}`}>
+            {notice.text}
+          </p>
+        )}
+
+        {classes.length === 0 ? (
+          <p className="hint">
+            You have not joined any classes yet.
+          </p>
+        ) : (
+          <ul className="list">
+            {classes.map((c) => (
               <li key={c.id}>
                 <strong>{c.name}</strong>
-                <span className="hint">{c.memberCount} members</span>
+                <span className="hint">
+                  {c.studentCount} students
+                </span>
               </li>
             ))}
           </ul>

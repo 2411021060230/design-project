@@ -6,6 +6,8 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import SubjectPage from "./pages/SubjectPage.jsx";
 import QuizPage from "./pages/QuizPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
+import LessonsPage from "./pages/LessonsPage.jsx";
+import LessonDetailPage from "./pages/LessonDetailPage.jsx";
 
 // Pages that need a logged-in user. Everyone else is sent to the login page.
 function Protected({ children }) {
@@ -29,6 +31,8 @@ export default function App() {
         <Route path="/subjects/:slug" element={<Protected><SubjectPage /></Protected>} />
         <Route path="/subjects/:slug/topics/:topicId" element={<Protected><QuizPage /></Protected>} />
         <Route path="/games/:gameId" element={<Protected><GamePage /></Protected>} />
+        <Route path="/lessons" element={<Protected><LessonsPage /></Protected>} />
+        <Route path="/lessons/:lessonId" element={<Protected><LessonDetailPage /></Protected>} />
         <Route path="*" element={<section className="card"><h2>Page not found</h2><a href="/">Go home</a></section>} />
       </Routes>
     </Layout>
